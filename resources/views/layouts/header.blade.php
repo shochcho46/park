@@ -27,7 +27,8 @@
                                 {{Auth::guard('admin')->user()->name}}
                             @endauth
                         </p>
-                    </li> <!--end::User Image--> <!--begin::Menu Body-->
+                    </li>
+                     <!--end::User Image--> <!--begin::Menu Body-->
 
                      <!--end::Menu Body--> <!--begin::Menu Footer-->
                     @auth('web')
