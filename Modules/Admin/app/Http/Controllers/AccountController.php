@@ -20,10 +20,10 @@ class AccountController extends Controller
     {
         $limit = $request->limit ?? 20;
 
-        $startDate = Carbon::parse($request->start_date)->startOfDay() ?? null;
-        $endDate = Carbon::parse($request->end_date)->endOfDay() ?? null;
+        $startDate = $request->start_date ? Carbon::parse($request->start_date)->startOfDay() : null;
+        $endDate = $request->end_date ? Carbon::parse($request->end_date)->endOfDay() : null;
 
-        $datas = Account::with('category')
+        $query = Account::with('category')
                     ->orderBy('id', 'desc')
                     ->when($request->search, function($query) use ($request){
                         $query->where('note', 'like', '%'.$request->search.'%')
@@ -31,10 +31,50 @@ class AccountController extends Controller
                                   $q->where('name', 'like', '%'.$request->search.'%');
                               });
                     })
-                    ->dateRange($startDate, $endDate)
-                    ->paginate($limit);
+                    ->when($request->category_id, function($query) use ($request) {
+                        $query->where('category_id', $request->category_id);
+                    });
 
-        return view('admin::account.index', compact('datas'));
+        if ($startDate || $endDate) {
+            $query->whereBetween('created_at', [
+                $startDate ?? Carbon::minValue(),
+                $endDate ?? Carbon::maxValue()
+            ]);
+        }
+
+        $datas = $query->paginate($limit);
+
+        // Get categories for dropdown
+        $categories = Category::active()->orderBy('name')->get();
+
+        // Calculate totals for summary
+        $totalQuery = Account::query();
+        
+        // Apply same filters for totals
+        if ($request->search) {
+            $totalQuery->where(function($q) use ($request) {
+                $q->where('note', 'like', '%'.$request->search.'%')
+                  ->orWhereHas('category', function($subQ) use ($request) {
+                      $subQ->where('name', 'like', '%'.$request->search.'%');
+                  });
+            });
+        }
+        
+        if ($request->category_id) {
+            $totalQuery->where('category_id', $request->category_id);
+        }
+        
+        if ($startDate || $endDate) {
+            $totalQuery->whereBetween('created_at', [
+                $startDate ?? Carbon::minValue(),
+                $endDate ?? Carbon::maxValue()
+            ]);
+        }
+
+        $totalIncome = $totalQuery->clone()->where('type', 1)->sum('totalAmount');
+        $totalExpense = $totalQuery->clone()->where('type', 2)->sum('totalAmount');
+
+        return view('admin::account.index', compact('datas', 'categories', 'totalIncome', 'totalExpense'));
     }
 
     /**
@@ -154,7 +194,9 @@ class AccountController extends Controller
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'type' => 'nullable|array',
-            'type.*' => 'in:1,2'
+            'type.*' => 'in:1,2',
+            'category_id' => 'nullable|exists:categories,id',
+            'search' => 'nullable|string'
         ]);
 
         // Generate filename with current date and filters
