@@ -54,6 +54,11 @@ class AccountsExport implements FromCollection, WithHeadings, WithEvents, Should
             });
         }
 
+        // Apply category filter
+        if ($this->request->category_id) {
+            $query->where('category_id', $this->request->category_id);
+        }
+
         // Apply type filter
         if (!empty($this->request->type)) {
             $query->whereIn('type', $this->request->type);
@@ -78,75 +83,120 @@ class AccountsExport implements FromCollection, WithHeadings, WithEvents, Should
             ];
         });
 
-        // Add summary rows
-        $exportData->push([
-            'category' => '',
-            'number_ticket' => '',
-            'ticket_price' => '',
-            'income' => '',
-            'expense' => '',
-            'note' => '',
-            'created_at' => ''
-        ]);
-        $exportData->push([
-            'category' => '',
-            'number_ticket' => '',
-            'ticket_price' => '',
-            'income' => '',
-            'expense' => '',
-            'note' => '',
-            'created_at' => ''
-        ]);
-        $exportData->push([
-            'category' => '',
-            'number_ticket' => '',
-            'ticket_price' => '',
-            'income' => '',
-            'expense' => '',
-            'note' => '',
-            'created_at' => ''
-        ]);
+        // Check if both types are selected for summary
+        $types = $this->request->type ?? [];
+        $showFullSummary = in_array('1', $types) && in_array('2', $types);
+        $showIncomeOnly = in_array('1', $types) && !in_array('2', $types);
+        $showExpenseOnly = !in_array('1', $types) && in_array('2', $types);
 
-        $exportData->push([
-            'category' => '',
-            'number_ticket' => '',
-            'ticket_price' => 'SUMMARY',
-            'income' => '',
-            'expense' => '',
-            'note' => '',
-            'created_at' => ''
-        ]);
+        // Add summary rows only if at least one type is selected
+        if (!empty($types)) {
+            // Add empty rows for spacing
+            $exportData->push([
+                'category' => '',
+                'number_ticket' => '',
+                'ticket_price' => '',
+                'income' => '',
+                'expense' => '',
+                'created_at' => '',
+                'note' => ''
+            ]);
+            $exportData->push([
+                'category' => '',
+                'number_ticket' => '',
+                'ticket_price' => '',
+                'income' => '',
+                'expense' => '',
+                'created_at' => '',
+                'note' => ''
+            ]);
 
-        $exportData->push([
-            'category' => '',
-            'number_ticket' => '',
-            'ticket_price' => 'Total:',
-            'income' => '৳' . number_format($this->totalIncome, 2),
-            'expense' => '৳' . number_format($this->totalExpense, 2),
-            'note' => '',
-            'created_at' => ''
-        ]);
+            if ($showFullSummary) {
+                // Show complete summary with both income and expense
+                $exportData->push([
+                    'category' => '',
+                    'number_ticket' => '',
+                    'ticket_price' => 'SUMMARY',
+                    'income' => '',
+                    'expense' => '',
+                    'created_at' => '',
+                    'note' => ''
+                ]);
 
-         $exportData->push([
-            'category' => '',
-            'number_ticket' => '',
-            'ticket_price' => '',
-            'income' => '',
-            'expense' => '',
-            'note' => '',
-            'created_at' => ''
-        ]);
+                $exportData->push([
+                    'category' => '',
+                    'number_ticket' => '',
+                    'ticket_price' => 'Total:',
+                    'income' => '৳' . number_format($this->totalIncome, 2),
+                    'expense' => '৳' . number_format($this->totalExpense, 2),
+                    'created_at' => '',
+                    'note' => ''
+                ]);
 
-        $profit = $this->totalIncome - $this->totalExpense;
-        $exportData->push([
-            'category' => '',
-            'number_ticket' => '',
-            'ticket_price' => 'Result:',
-            'income' => '৳' . number_format($profit, 2),
-            'expense' => $profit >= 0 ? 'PROFIT' : 'LOSS',
-            'note' => '',
-            'created_at' => ''
-        ]);
+                $exportData->push([
+                    'category' => '',
+                    'number_ticket' => '',
+                    'ticket_price' => '',
+                    'income' => '',
+                    'expense' => '',
+                    'created_at' => '',
+                    'note' => ''
+                ]);
+
+                $profit = $this->totalIncome - $this->totalExpense;
+                $exportData->push([
+                    'category' => '',
+                    'number_ticket' => '',
+                    'ticket_price' => 'Result:',
+                    'income' => '৳' . number_format($profit, 2),
+                    'expense' => $profit >= 0 ? 'PROFIT' : 'LOSS',
+                    'created_at' => '',
+                    'note' => ''
+                ]);
+            } elseif ($showIncomeOnly) {
+                // Show only income summary
+                $exportData->push([
+                    'category' => '',
+                    'number_ticket' => '',
+                    'ticket_price' => 'INCOME SUMMARY',
+                    'income' => '',
+                    'expense' => '',
+                    'created_at' => '',
+                    'note' => ''
+                ]);
+
+                $exportData->push([
+                    'category' => '',
+                    'number_ticket' => '',
+                    'ticket_price' => 'Total Income:',
+                    'income' => '৳' . number_format($this->totalIncome, 2),
+                    'expense' => '',
+                    'created_at' => '',
+                    'note' => ''
+                ]);
+            } elseif ($showExpenseOnly) {
+                // Show only expense summary
+                $exportData->push([
+                    'category' => '',
+                    'number_ticket' => '',
+                    'ticket_price' => 'EXPENSE SUMMARY',
+                    'income' => '',
+                    'expense' => '',
+                    'created_at' => '',
+                    'note' => ''
+                ]);
+
+                $exportData->push([
+                    'category' => '',
+                    'number_ticket' => '',
+                    'ticket_price' => 'Total Expense:',
+                    'income' => '',
+                    'expense' => '৳' . number_format($this->totalExpense, 2),
+                    'created_at' => '',
+                    'note' => ''
+                ]);
+            }
+        }
 
         return $exportData;
     }
@@ -196,22 +246,23 @@ class AccountsExport implements FromCollection, WithHeadings, WithEvents, Should
                     ]
                 ]);
 
-                // Style data rows
-                $dataRange = 'A2:' . $highestColumn . ($highestRow - 5);
-                $sheet->getStyle($dataRange)->applyFromArray([
-                    'borders' => [
-                        'allBorders' => [
-                            'borderStyle' => Border::BORDER_THIN,
-                            'color' => ['rgb' => 'CCCCCC']
+                // Style data rows - check if there are enough rows
+                if ($highestRow > 6) {
+                    $dataRange = 'A2:' . $highestColumn . ($highestRow - 5);
+                    $sheet->getStyle($dataRange)->applyFromArray([
+                        'borders' => [
+                            'allBorders' => [
+                                'borderStyle' => Border::BORDER_THIN,
+                                'color' => ['rgb' => 'CCCCCC']
+                            ]
                         ]
-                    ]
-                ]);
+                    ]);
+                }
 
                 // Style summary section
                 $summaryStartRow = $highestRow - 4;
 
-
-                // Style total rows
+                // Style summary rows
                 for ($i = $summaryStartRow + 1; $i <= $highestRow; $i++) {
                     $sheet->getStyle('C' . $i . ':E' . $i)->applyFromArray([
                         'font' => [

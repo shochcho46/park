@@ -44,11 +44,22 @@
                                 <label for="end_date" class="form-label">End Date</label>
                                 <input type="date" class="form-control" id="end_date" name="end_date" value="{{ request('end_date') }}">
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
+                                <label for="category_id" class="form-label">Category</label>
+                                <select class="form-control" id="category_id" name="category_id">
+                                    <option value="">All Categories</option>
+                                    @foreach($categories as $category)
+                                        <option value="{{ $category->id }}" {{ request('category_id') == $category->id ? 'selected' : '' }}>
+                                            {{ $category->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-2">
                                 <label for="search" class="form-label">Search</label>
                                 <input type="text" class="form-control" id="search" name="search" placeholder="Search..." value="{{ request('search') }}">
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <div class="d-flex gap-2">
                                     <button type="submit" class="btn btn-primary">Filter</button>
                                     <a href="{{ route('admin.account.index') }}" class="btn btn-secondary">Clear</a>
@@ -196,6 +207,12 @@ function exportData() {
     // Add type parameters
     if (incomeChecked) formData.append('type[]', '1');
     if (expenseChecked) formData.append('type[]', '2');
+
+    // Add category filter if selected
+    const categoryId = document.getElementById('category_id').value;
+    if (categoryId) {
+        formData.append('category_id', categoryId);
+    }
 
     // Create URL with parameters
     const params = new URLSearchParams(formData);
