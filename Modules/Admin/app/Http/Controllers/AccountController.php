@@ -99,9 +99,22 @@ class AccountController extends Controller
             'type' => 'required|in:1,2',
             'note' => 'nullable|string|max:255',
             'document' => 'nullable|file|mimes:jpeg,png,gif,pdf,doc,docx|max:10240', // 10MB max
+            'custom_datetime' => 'nullable|date',
         ]);
 
+        // Remove custom_datetime from data as it's not a database field
+        $customDateTime = $validatedData['custom_datetime'] ?? null;
+        unset($validatedData['custom_datetime']);
+
         $account = Account::create($validatedData);
+
+        // Set custom timestamps if provided
+        if ($customDateTime) {
+            $customTimestamp = Carbon::parse($customDateTime);
+            $account->created_at = $customTimestamp;
+            $account->updated_at = $customTimestamp;
+            $account->save();
+        }
 
         // Handle file upload
         if ($request->hasFile('document')) {
@@ -149,9 +162,22 @@ class AccountController extends Controller
             'type' => 'required|in:1,2',
             'note' => 'nullable|string|max:255',
             'document' => 'nullable|file|mimes:jpeg,png,gif,pdf,doc,docx|max:10240', // 10MB max
+            'custom_datetime' => 'nullable|date',
         ]);
 
+        // Remove custom_datetime from data as it's not a database field
+        $customDateTime = $validatedData['custom_datetime'] ?? null;
+        unset($validatedData['custom_datetime']);
+
         $account->update($validatedData);
+
+        // Set custom timestamps if provided
+        if ($customDateTime) {
+            $customTimestamp = Carbon::parse($customDateTime);
+            $account->updated_at = $customTimestamp;
+            $account->created_at = $customTimestamp;
+            $account->save();
+        }
 
         // Handle file upload
         if ($request->hasFile('document')) {

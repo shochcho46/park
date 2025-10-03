@@ -11,6 +11,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class Account extends Model implements HasMedia
 {
     use HasFactory, InteractsWithMedia;
+    public $timestamps = true; 
 
     protected $fillable = [
         'category_id',

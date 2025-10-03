@@ -140,6 +140,15 @@
                                 @enderror
                             </div>
 
+                            <div class="mb-3">
+                                <label for="custom_datetime" class="form-label">Date & Time</label>
+                                <input type="datetime-local" class="form-control" id="custom_datetime" name="custom_datetime" value="{{ old('custom_datetime', $data->created_at ? $data->created_at->format('Y-m-d\TH:i') : now()->format('Y-m-d\TH:i')) }}">
+                                <small class="form-text text-muted">Update the date and time for this account entry. This will update the updated_at timestamp.</small>
+                                @error('custom_datetime')
+                                    <span class="text-danger">{{ $message }}</span>
+                                @enderror
+                            </div>
+
                         </div> <!--end::Body--> <!--begin::Footer-->
                         <div class="card-footer">
                             <button type="submit" class="btn btn-primary">Update</button>
