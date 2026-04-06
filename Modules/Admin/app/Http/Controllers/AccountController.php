@@ -32,7 +32,18 @@ class AccountController extends Controller
                               });
                     })
                     ->when($request->category_id, function($query) use ($request) {
-                        $query->where('category_id', $request->category_id);
+                        // Support multiple category selection
+                        if (is_array($request->category_id)) {
+                            $query->whereIn('category_id', $request->category_id);
+                        } else {
+                            $query->where('category_id', $request->category_id);
+                        }
+                    })
+                    ->when($request->type, function($query) use ($request) {
+                        // Support type filtering (1=Income, 2=Expense)
+                        if (is_array($request->type) && count($request->type) > 0) {
+                            $query->whereIn('type', $request->type);
+                        }
                     });
 
         if ($startDate || $endDate) {
@@ -49,7 +60,7 @@ class AccountController extends Controller
 
         // Calculate totals for summary
         $totalQuery = Account::query();
-        
+
         // Apply same filters for totals
         if ($request->search) {
             $totalQuery->where(function($q) use ($request) {
@@ -59,11 +70,20 @@ class AccountController extends Controller
                   });
             });
         }
-        
+
         if ($request->category_id) {
-            $totalQuery->where('category_id', $request->category_id);
+            // Support multiple category selection
+            if (is_array($request->category_id)) {
+                $totalQuery->whereIn('category_id', $request->category_id);
+            } else {
+                $totalQuery->where('category_id', $request->category_id);
+            }
         }
-        
+
+        if ($request->type && is_array($request->type) && count($request->type) > 0) {
+            $totalQuery->whereIn('type', $request->type);
+        }
+
         if ($startDate || $endDate) {
             $totalQuery->whereBetween('created_at', [
                 $startDate ?? Carbon::minValue(),
@@ -221,7 +241,8 @@ class AccountController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'type' => 'nullable|array',
             'type.*' => 'in:1,2',
-            'category_id' => 'nullable|exists:categories,id',
+            'category_id' => 'nullable|array',
+            'category_id.*' => 'exists:categories,id',
             'search' => 'nullable|string'
         ]);
 
