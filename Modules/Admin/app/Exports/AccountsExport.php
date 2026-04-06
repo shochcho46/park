@@ -56,7 +56,12 @@ class AccountsExport implements FromCollection, WithHeadings, WithEvents, Should
 
         // Apply category filter
         if ($this->request->category_id) {
-            $query->where('category_id', $this->request->category_id);
+            // Support multiple category selection
+            if (is_array($this->request->category_id)) {
+                $query->whereIn('category_id', $this->request->category_id);
+            } else {
+                $query->where('category_id', $this->request->category_id);
+            }
         }
 
         // Apply type filter
