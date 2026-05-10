@@ -156,6 +156,133 @@ class AdminController extends Controller
         return view('admin.dashboard', compact('data'));
     }
 
+    public function getAvailableYears()
+    {
+        $years = Account::selectRaw('DISTINCT YEAR(created_at) as year')
+            ->whereNotNull('created_at')
+            ->orderBy('year', 'desc')
+            ->pluck('year');
+
+        return response()->json([
+            'success' => true,
+            'years' => $years
+        ]);
+    }
+
+    public function getCategories()
+    {
+        $categories = Category::select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'categories' => $categories
+        ]);
+    }
+
+    public function getMonthlyData(Request $request)
+    {
+        $year = $request->input('year', date('Y'));
+        $categoryId = $request->input('category_id');
+
+        // Get category-wise monthly data for the specified year
+        $query = Account::selectRaw('
+                category_id,
+                MONTH(created_at) as month,
+                SUM(CASE WHEN type = 1 THEN totalAmount ELSE 0 END) as income,
+                SUM(CASE WHEN type = 2 THEN totalAmount ELSE 0 END) as expenses
+            ')
+            ->with('category:id,name')
+            ->whereYear('created_at', $year);
+
+        // Apply category filter if specified
+        if ($categoryId && $categoryId != 'all') {
+            $query->where('category_id', $categoryId);
+        }
+
+        $monthlyData = $query->groupBy('category_id', 'month')
+            ->orderBy('category_id')
+            ->orderBy('month')
+            ->get();
+
+        // Get categories based on filter
+        if ($categoryId && $categoryId != 'all') {
+            $categories = Category::where('id', $categoryId)->get();
+        } else {
+            $categories = Category::all();
+        }
+        $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        // Prepare category-wise data structure
+        $categoryWiseData = [];
+        $totalIncomeByMonth = array_fill(0, 12, 0);
+        $totalExpenseByMonth = array_fill(0, 12, 0);
+        $totalRevenueByMonth = array_fill(0, 12, 0);
+
+        foreach ($categories as $category) {
+            $categoryData = [
+                'category_id' => $category->id,
+                'category_name' => $category->name,
+                'months' => []
+            ];
+
+            $categoryTotalIncome = 0;
+            $categoryTotalExpense = 0;
+
+            for ($i = 0; $i < 12; $i++) {
+                $monthData = $monthlyData->where('category_id', $category->id)
+                    ->where('month', $i + 1)
+                    ->first();
+
+                $income = $monthData ? (float) $monthData->income : 0;
+                $expense = $monthData ? (float) $monthData->expenses : 0;
+                $profit = $income - $expense;
+
+                $categoryData['months'][] = [
+                    'month' => $months[$i],
+                    'income' => $income,
+                    'expense' => $expense,
+                    'profit' => $profit
+                ];
+
+                $categoryTotalIncome += $income;
+                $categoryTotalExpense += $expense;
+
+                // Add to totals
+                $totalIncomeByMonth[$i] += $income;
+                $totalExpenseByMonth[$i] += $expense;
+                $totalRevenueByMonth[$i] += $profit;
+            }
+
+            $categoryData['total_income'] = $categoryTotalIncome;
+            $categoryData['total_expense'] = $categoryTotalExpense;
+            $categoryData['total_profit'] = $categoryTotalIncome - $categoryTotalExpense;
+
+            $categoryWiseData[] = $categoryData;
+        }
+
+        // Overall totals
+        $overallTotals = [
+            'income' => array_sum($totalIncomeByMonth),
+            'expense' => array_sum($totalExpenseByMonth),
+            'profit' => array_sum($totalRevenueByMonth)
+        ];
+
+        return response()->json([
+            'success' => true,
+            'year' => $year,
+            'months' => $months,
+            'categoryWiseData' => $categoryWiseData,
+            'totalsByMonth' => [
+                'income' => $totalIncomeByMonth,
+                'expense' => $totalExpenseByMonth,
+                'profit' => $totalRevenueByMonth
+            ],
+            'overallTotals' => $overallTotals
+        ]);
+    }
+
 
     public function logout(Request $request): RedirectResponse
     {

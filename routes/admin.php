@@ -28,6 +28,9 @@ Route::prefix('admin')->group(function () {
         Route::controller(AdminController::class)->group(function () {
             Route::get('dashboard', 'dashboard')->name('admin.dashboard');
             Route::get('logout', 'logout')->name('admin.logout');
+            Route::get('get-available-years', 'getAvailableYears')->name('admin.getAvailableYears');
+            Route::get('get-categories', 'getCategories')->name('admin.getCategories');
+            Route::get('get-monthly-data', 'getMonthlyData')->name('admin.getMonthlyData');
 
         });
 
