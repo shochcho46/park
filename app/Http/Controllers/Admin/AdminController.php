@@ -158,14 +158,34 @@ class AdminController extends Controller
 
     public function getAvailableYears()
     {
-        $years = Account::selectRaw('DISTINCT YEAR(created_at) as year')
+        // Get fiscal years (July 1 to June 30) - Bangladesh economic year
+        $accounts = Account::selectRaw('DISTINCT YEAR(created_at) as year, MONTH(created_at) as month')
             ->whereNotNull('created_at')
             ->orderBy('year', 'desc')
-            ->pluck('year');
+            ->orderBy('month', 'desc')
+            ->get();
+
+        $fiscalYears = [];
+        foreach ($accounts as $account) {
+            // If month is July or later, fiscal year is current-next year
+            // If month is before July, fiscal year is previous-current year
+            if ($account->month >= 7) {
+                $fiscalYear = $account->year . '-' . ($account->year + 1);
+            } else {
+                $fiscalYear = ($account->year - 1) . '-' . $account->year;
+            }
+
+            if (!in_array($fiscalYear, $fiscalYears)) {
+                $fiscalYears[] = $fiscalYear;
+            }
+        }
+
+        // Sort fiscal years in descending order
+        rsort($fiscalYears);
 
         return response()->json([
             'success' => true,
-            'years' => $years
+            'years' => $fiscalYears
         ]);
     }
 
@@ -183,26 +203,55 @@ class AdminController extends Controller
 
     public function getMonthlyData(Request $request)
     {
-        $year = $request->input('year', date('Y'));
+        $fiscalYear = $request->input('year');
         $categoryId = $request->input('category_id');
 
-        // Get category-wise monthly data for the specified year
+        // Parse fiscal year (e.g., "2024-2025" means July 1, 2024 to June 30, 2025)
+        if ($fiscalYear && strpos($fiscalYear, '-') !== false) {
+            [$startYear, $endYear] = explode('-', $fiscalYear);
+        } else {
+            // Default to current fiscal year
+            $currentMonth = date('n');
+            $currentYear = date('Y');
+            if ($currentMonth >= 7) {
+                $startYear = $currentYear;
+                $endYear = $currentYear + 1;
+            } else {
+                $startYear = $currentYear - 1;
+                $endYear = $currentYear;
+            }
+        }
+
+        // Get category-wise monthly data for the fiscal year (July to June)
         $query = Account::selectRaw('
                 category_id,
+                YEAR(created_at) as year,
                 MONTH(created_at) as month,
                 SUM(CASE WHEN type = 1 THEN totalAmount ELSE 0 END) as income,
                 SUM(CASE WHEN type = 2 THEN totalAmount ELSE 0 END) as expenses
             ')
             ->with('category:id,name')
-            ->whereYear('created_at', $year);
+            ->where(function($q) use ($startYear, $endYear) {
+                // July to December of start year
+                $q->where(function($subQ) use ($startYear) {
+                    $subQ->whereYear('created_at', $startYear)
+                         ->whereMonth('created_at', '>=', 7);
+                })
+                // January to June of end year
+                ->orWhere(function($subQ) use ($endYear) {
+                    $subQ->whereYear('created_at', $endYear)
+                         ->whereMonth('created_at', '<=', 6);
+                });
+            });
 
         // Apply category filter if specified
         if ($categoryId && $categoryId != 'all') {
             $query->where('category_id', $categoryId);
         }
 
-        $monthlyData = $query->groupBy('category_id', 'month')
+        $monthlyData = $query->groupBy('category_id', 'year', 'month')
             ->orderBy('category_id')
+            ->orderBy('year')
             ->orderBy('month')
             ->get();
 
@@ -212,7 +261,9 @@ class AdminController extends Controller
         } else {
             $categories = Category::all();
         }
-        $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        // Fiscal year months: July to June
+        $months = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+        $monthNumbers = [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
 
         // Prepare category-wise data structure
         $categoryWiseData = [];
@@ -231,8 +282,12 @@ class AdminController extends Controller
             $categoryTotalExpense = 0;
 
             for ($i = 0; $i < 12; $i++) {
+                $monthNum = $monthNumbers[$i];
+                $yearToCheck = $monthNum >= 7 ? $startYear : $endYear;
+
                 $monthData = $monthlyData->where('category_id', $category->id)
-                    ->where('month', $i + 1)
+                    ->where('month', $monthNum)
+                    ->where('year', $yearToCheck)
                     ->first();
 
                 $income = $monthData ? (float) $monthData->income : 0;
@@ -271,7 +326,8 @@ class AdminController extends Controller
 
         return response()->json([
             'success' => true,
-            'year' => $year,
+            'year' => $startYear . '-' . $endYear,
+            'fiscalYear' => $startYear . '-' . $endYear,
             'months' => $months,
             'categoryWiseData' => $categoryWiseData,
             'totalsByMonth' => [
