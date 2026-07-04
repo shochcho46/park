@@ -1,8 +1,26 @@
 @extends('layouts.app')
 
 @push('custome-css')
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<style>
+.dropdown-menu {
+    max-height: 300px;
+    overflow-y: auto;
+}
+.dropdown-menu li:hover {
+    background-color: #f8f9fa;
+}
+.form-check-input:checked + .form-check-label {
+    font-weight: 600;
+    color: #0d6efd;
+}
+#categoryButtonText {
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 90%;
+}
+</style>
 @endpush
 
 @section('content')
@@ -53,13 +71,28 @@
                             <div class="row mb-3">
                                 <div class="col-md-12">
                                     <label for="category_id" class="form-label">Category</label>
-                                    <select class="form-control select2-multiple" id="category_id" name="category_id[]" multiple="multiple">
-                                        @foreach($categories as $category)
-                                            <option value="{{ $category->id }}" {{ in_array($category->id, (array)request('category_id', [])) ? 'selected' : '' }}>
-                                                {{ $category->name }}
-                                            </option>
-                                        @endforeach
-                                    </select>
+                                    <div class="dropdown w-100">
+                                        <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" id="categoryDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <span id="categoryButtonText">Select categories...</span>
+                                        </button>
+                                        <ul class="dropdown-menu w-100 p-2" aria-labelledby="categoryDropdown" style="max-height: 300px; overflow-y: auto;" onclick="event.stopPropagation()">
+                                            <li class="mb-2">
+                                                <button type="button" class="btn btn-sm btn-primary me-2" onclick="selectAllCategories()">Select All</button>
+                                                <button type="button" class="btn btn-sm btn-secondary" onclick="clearAllCategories()">Clear All</button>
+                                            </li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            @foreach($categories as $category)
+                                                <li class="px-2 py-1">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input category-checkbox" type="checkbox" name="category_id[]" value="{{ $category->id }}" id="category_{{ $category->id }}" {{ in_array($category->id, (array)request('category_id', [])) ? 'checked' : '' }} onchange="updateCategoryButtonText()">
+                                                        <label class="form-check-label" for="category_{{ $category->id }}">
+                                                            {{ $category->name }}
+                                                        </label>
+                                                    </div>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
                                 </div>
                             </div>
 
@@ -223,16 +256,10 @@
 
 
 @push('custome-js')
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 $(document).ready(function() {
-    // Initialize Select2 for category dropdown
-    $('.select2-multiple').select2({
-        theme: 'bootstrap-5',
-        placeholder: 'Select categories...',
-        allowClear: true,
-        width: '100%'
-    });
+    // Initialize category button text on page load
+    updateCategoryButtonText();
 
     // Ensure at least one type is selected for filtering
     $('#type_income, #type_expense').on('change', function() {
@@ -249,6 +276,41 @@ $(document).ready(function() {
         }
     });
 });
+
+// Update category button text based on selected checkboxes
+function updateCategoryButtonText() {
+    const checkboxes = document.querySelectorAll('.category-checkbox:checked');
+    const buttonText = document.getElementById('categoryButtonText');
+
+    if (checkboxes.length === 0) {
+        buttonText.textContent = 'Select categories...';
+        buttonText.style.color = '#6c757d';
+    } else if (checkboxes.length === 1) {
+        buttonText.textContent = checkboxes[0].nextElementSibling.textContent.trim();
+        buttonText.style.color = '#212529';
+    } else {
+        buttonText.textContent = `Categories (${checkboxes.length} selected)`;
+        buttonText.style.color = '#212529';
+    }
+}
+
+// Select all categories
+function selectAllCategories() {
+    const checkboxes = document.querySelectorAll('.category-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    updateCategoryButtonText();
+}
+
+// Clear all categories
+function clearAllCategories() {
+    const checkboxes = document.querySelectorAll('.category-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    updateCategoryButtonText();
+}
 
 // Export function - exports the currently filtered results
 function exportData() {

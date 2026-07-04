@@ -329,20 +329,32 @@
                         data.years.forEach(year => {
                             const option = document.createElement('option');
                             option.value = year;
-                            option.textContent = year;
+                            option.textContent = 'FY ' + year;
                             yearFilter.appendChild(option);
 
                             const option2 = document.createElement('option');
                             option2.value = year;
-                            option2.textContent = year;
+                            option2.textContent = 'FY ' + year;
                             yearFilter2.appendChild(option2);
                         });
 
-                        // Set current year as default
-                        const currentYear = new Date().getFullYear();
-                        if (data.years.includes(currentYear)) {
-                            yearFilter.value = currentYear;
-                            yearFilter2.value = currentYear;
+                        // Set current fiscal year as default
+                        const today = new Date();
+                        const currentYear = today.getFullYear();
+                        const currentMonth = today.getMonth() + 1; // JavaScript months are 0-indexed
+
+                        // If current month is July (7) or later, fiscal year is current-next
+                        // If current month is before July, fiscal year is previous-current
+                        let currentFiscalYear;
+                        if (currentMonth >= 7) {
+                            currentFiscalYear = currentYear + '-' + (currentYear + 1);
+                        } else {
+                            currentFiscalYear = (currentYear - 1) + '-' + currentYear;
+                        }
+
+                        if (data.years.includes(currentFiscalYear)) {
+                            yearFilter.value = currentFiscalYear;
+                            yearFilter2.value = currentFiscalYear;
                         } else {
                             yearFilter.value = data.years[0];
                             yearFilter2.value = data.years[0];
